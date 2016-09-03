@@ -291,6 +291,7 @@ class TreeBuilder(object):
                 if os.path.exists(initrd):
                     os.rename(initrd, initrd + backup)
             cmd = dracut + [outfile, kernel.version]
+            logger.debug("cmd=%s", cmd)
             runcmd(cmd, root=self.vars.inroot)
 
             # ppc64 cannot boot images > 32MiB, check size and warn

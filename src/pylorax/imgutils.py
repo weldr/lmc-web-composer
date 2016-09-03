@@ -123,8 +123,8 @@ def mkrootfsimg(rootdir, outfile, label, size=2, sysroot=""):
 
 def mksparse(outfile, size):
     '''use os.ftruncate to create a sparse file of the given size.'''
-    fobj = open(outfile, "w")
-    os.ftruncate(fobj.fileno(), size)
+    with open(outfile, "w") as fobj:
+        os.ftruncate(fobj.fileno(), size)
 
 def mkqcow2(outfile, size, options=None):
     '''use qemu-img to create a file of the given size.

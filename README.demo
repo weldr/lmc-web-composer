@@ -1,0 +1,42 @@
+This experimental demo works by running anaconda on the local system to create a live iso.
+
+It is based on livemedia-creator with most of the unnecessary code removed from
+it.  It uses the Bottle web framework and Mako templates for the UI. Templates
+are in ./share/html/templates/ It places the resulting iso in
+./share/html/static/ using a unique name.
+
+HOW TO RUN THIS
+===============
+
+Install the requirements for lorax, either by installing lorax or by reading
+them from the lorax.spec file.  Install anaconda-core and anaconda-tui
+
+Run it, as root, from the working directory like so:
+
+PYTHONPATH=./src/ ./src/sbin/lmc-web-composer --debug --ks-template=./share/composer-template.ks
+
+Add a --proxy if you have one, it'll speed things up when you have to rerun it.
+
+Browse to port 80 on the system it is running on, eg. http://localhost/ Click
+on the BIG RED BUTTON.  Wait a while. Eventually the iso will show up under
+http://localhost/isos/
+
+If things break there will be a traceback on the console it was run from. Logs
+from the anaconda run are copied into /var/log/lmc-web-composer/ and the
+application's logs are in /var/log/lmc-web-composer.log and program.log
+
+Current state is that this is a VERY rough demo with a single API entry:
+
+POST to /api/v0/compose will trigger running anaconda with the specified
+kickstart template using the Fedora 24 repos, and adding tmux and screen to the
+package list.
+
+Some things that need to be figured out:
+
+1. User selection of repos and 'modules' to feed to the kickstart template
+2. A better UI maybe?
+3. Feedback to the UI during the compose process.
+4. Debug output in the UI when it fails.
+5. Tell the UI when the compose finished and where to find the final iso.
+6. Lock the compose so that it won't run more than one at a time.
+

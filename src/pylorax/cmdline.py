@@ -286,3 +286,30 @@ def lmc_parser(dracut_default=""):
                         help="Cancel installer after X minutes")
 
     return parser
+
+
+def lmc_composer_parser(dracut_default=""):
+    """ Return a ArgumentParser object for lmc-web-composer demo."""
+    parser = argparse.ArgumentParser(description="LMC Web Composer Demo",
+                                     fromfile_prefix_chars="@")
+
+    parser.add_argument("--port", default=80,
+                        help="Port to listen to")
+    parser.add_argument("--logfile", default="/var/log/lmc-web-composer.log",
+                        type=os.path.abspath,
+                        help="Name and path for primary logfile, other logs will "
+                             "be created in the same directory.")
+    parser.add_argument("--lorax-templates", default=None,
+                        type=os.path.abspath,
+                        help="Path to mako templates for lorax")
+    parser.add_argument("--ks-template", default="/usr/share/lorax/composer-template.ks",
+                        type=os.path.abspath,
+                        help="Path to kickstart mako template")
+    parser.add_argument("--debug", default=False, action="store_true",
+                        help="Enable extra debugging output")
+    parser.add_argument("--tmp", default="/var/tmp", type=os.path.abspath,
+                        help="Top level temporary directory")
+    parser.add_argument("--proxy", default=None,
+                        help="proxy url:port", metavar="HOST")
+
+    return parser
