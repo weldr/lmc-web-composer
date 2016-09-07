@@ -39,4 +39,4 @@ Some things that need to be figured out:
 4. Debug output in the UI when it fails.
 5. Tell the UI when the compose finished and where to find the final iso.
 6. Lock the compose so that it won't run more than one at a time.
-
+7. Lock the dnf API while metadata is being downloaded.

@@ -30,6 +30,8 @@ import shutil
 import glob
 import threading
 from collections import namedtuple
+import dnf
+from binascii import hexlify
 
 # Use pykickstart to calculate disk image size
 from pykickstart.parser import KickstartParser
@@ -53,12 +55,17 @@ from pylorax.executils import execWithRedirect, execReadlines
 from pylorax.monitor import LogMonitor
 from pylorax.cmdline import lmc_composer_parser
 
+from pyanaconda.queuefactory import QueueFactory
+
 # Default parameters for rebuilding initramfs, override with --dracut-args
 DRACUT_DEFAULT = ["--xz", "--add", "livenet dmsquash-live convertfs pollcdrom qemu qemu-net",
                   "--omit", "plymouth", "--no-hostonly", "--debug", "--no-early-microcode"]
 
 ROOT_PATH = "/mnt/sysimage/"
 RUNTIME = "images/install.img"
+
+DEFAULT_REPOS = ["https://dl.fedoraproject.org/pub/fedora/linux/releases/24/Everything/x86_64/os/",
+                 "https://dl.fedoraproject.org/pub/fedora/linux/updates/24/x86_64/"]
 
 class InstallError(Exception):
     pass
@@ -453,6 +460,196 @@ def make_novirt_liveiso(config, ks_file, iso_dest):
     return True
 
 
+def get_dbo(tempdir, repositories, releasever, best):
+    """ Create a dnf Base object and setup the repositories and installroot
+
+        :param list repositories: List of repositories to use for the installation
+        :param string releasever: Release version to pass to dnf
+
+    """
+    def sanitize_repo(repo):
+        """Convert bare paths to file:/// URIs, and silently reject protocols unhandled by yum"""
+        if repo.startswith("/"):
+            return "file://{0}".format(repo)
+        elif any(repo.startswith(p) for p in ('http://', 'https://', 'ftp://', 'file://')):
+            return repo
+        else:
+            return None
+
+    # sanitize the repositories
+    repositories = list(sanitize_repo(r) for r in repositories)
+
+    # remove invalid repositories
+    repositories = list(r for r in repositories if r)
+
+    cachedir = os.path.join(tempdir, "dnf.cache")
+    if not os.path.isdir(cachedir):
+        os.mkdir(cachedir)
+
+    logdir = os.path.join(tempdir, "dnf.logs")
+    if not os.path.isdir(logdir):
+        os.mkdir(logdir)
+
+    installroot = os.path.join(tempdir, "installroot")
+    if not os.path.isdir(installroot):
+        os.mkdir(installroot)
+
+    dnfbase = dnf.Base()
+    conf = dnfbase.conf
+
+    log.info("Use highest NVR package? %s", best)
+    conf.best = best
+
+    # setup dirs.
+    conf.logdir = logdir
+    conf.cachedir = cachedir
+
+    # Turn off logging to the console
+    conf.debuglevel = 10
+    conf.errorlevel = 0
+    conf.debug_solver = True
+
+    conf.releasever = releasever
+    conf.installroot = installroot
+    conf.prepend_installroot('persistdir')
+#    conf.tsflags.append('nodocs')
+
+    # add the repositories
+    for i, r in enumerate(repositories):
+        if "SRPM" in r or "srpm" in r:
+            log.info("Skipping source repo: %s", r)
+            continue
+        repo_name = "lorax-repo-%d" % i
+        repo = dnf.repo.Repo(repo_name, cachedir)
+        repo.baseurl = [r]
+        repo.skip_if_unavailable = False
+        repo.enable()
+        dnfbase.repos.add(repo)
+        log.info("Added '%s': %s", repo_name, r)
+        log.info("Fetching metadata for %s", repo_name)
+        try:
+            repo.load()
+        except dnf.exceptions.RepoError as e:
+            log.error("Error fetching metadata for %s: %s", repo_name, e)
+            return None
+        log.info("Fetching metadata for %s finished.", repo_name)
+
+    dnfbase.fill_sack(load_system_repo=False)
+    dnfbase.read_comps()
+
+    return dnfbase
+
+
+def get_dnf_transaction(dbo, packages):
+    dbo.reset(goal=True, sack=False, repos=False)
+
+    for pkg in packages:
+        log.info("Adding %s to the transaction", pkg)
+        try:
+            dbo.install(pkg)
+        except Exception as e:          # pylint: disable=broad-except
+            log.error("Failed to install %s\n%s", pkg, e)
+
+    try:
+        log.info("Checking dependencies")
+        dbo.resolve()
+    except dnf.exceptions.DepsolveError as e:
+        log.error("Dependency check failed: %s", e)
+        raise
+
+    log.info("%d packages selected", len(dbo.transaction))
+    if len(dbo.transaction) == 0:
+        raise Exception("No packages in transaction")
+
+    return [pkg.pkgtup for pkg in dbo.transaction.install_set]
+
+
+def get_pkg_info(pkg):
+    """ Get detailed info on the package.
+
+    Returns a dict of the attributes.
+    """
+    PKG_ATTRS = ("arch", "buildtime", "description", "downloadsize", "evr", "installsize",
+                "installtime", "license", "name", "packager", "size", "sourcerpm", "summary",
+                "url", "files")
+
+    info = {}
+    for attr in PKG_ATTRS:
+        info[attr] = getattr(pkg, attr, "")
+
+    info["chksum"] = hexlify(pkg.chksum[1]).decode()
+
+    PKG_LISTS = ("conflicts", "enhances", "obsoletes", "provides", "recommends", "requires",
+                "suggests", "supplements")
+    for l in PKG_LISTS:
+        info[l] = [str(p) for p in getattr(pkg, l, [])]
+
+    return info
+
+
+def run_dnf_thread(config, dnf_q):
+    """ Handle all DNF object operations in this thread.
+
+    :param queue: A queue used to receive commands
+
+    Requests that require a reply will pass in an instance of a reply queue
+    that takes a q.send_reply(<dict>) response. A new reply queue must be
+    created for each request.
+    """
+    dbo = get_dbo(config.dnf_dir, DEFAULT_REPOS, 24, True)
+
+    # maintain a DNF base object
+    # Answer queries from other threads
+    # reset/update the repos
+    while True:
+        (code, args) = dnf_q.q.get(True)
+
+        if code == dnf_q.DNF_CODE_QUIT:
+            break
+        elif code == dnf_q.DNF_CODE_REPOS:
+            if len(args) == 0 or len(args[0]) == 0:
+                continue
+            dbo = get_dbo(config.dnf_dir, args[0], 24, True)
+
+        elif code == dnf_q.DNF_CODE_TRANSACTION:
+            if len(args) < 2 or len(args[0]) == 0:
+                continue
+            q = args[1]
+
+            try:
+                packages = get_dnf_transaction(dbo, args[0])
+            except Exception as e:          # pylint: disable=broad-except
+                q.send_reply({"error": str(e)})
+                continue
+
+            q.send_reply({"packages": packages})
+
+        elif code == dnf_q.DNF_CODE_INFO:
+            if len(args) < 2 or len(args[0]) == 0:
+                continue
+            q = args[1]
+
+            # Get the details about all the packages
+            reply = {}
+            query = dbo.sack.query()
+            available = query.available()
+            for pkg in args[0]:
+                answer = available.filter(name=pkg)
+                for pkg in answer:
+                    info = get_pkg_info(pkg)
+                    reply[pkg.name] = info
+
+            q.send_reply(reply)
+
+
+def start_dnf_thread(config, dnf_q):
+    t = threading.Thread(target=run_dnf_thread, args=(config, dnf_q,))
+    t.daemon = True
+    t.start()
+
+    return True
+
+
 def start_compose_thread(config, iso_dest, url, repos=None, packages=None):
     """ Start a thread running the compose
 
@@ -483,6 +680,13 @@ def start_compose_thread(config, iso_dest, url, repos=None, packages=None):
     return True
 
 
+def new_reply_q():
+    """ Return a new reply queue"""
+    reply_q = QueueFactory("dnf")
+    reply_q.addMessage("reply", 1)      # dict
+    return reply_q
+
+
 def run_bottle_app(config):
     """ Run the web application"""
     TEMPLATE_FILES = config.share_dir+"/html/templates/"
@@ -493,6 +697,17 @@ def run_bottle_app(config):
     from bottle import abort, post, route, run, static_file
     from bottle import mako_template as template
     bottle.TEMPLATE_PATH = [TEMPLATE_FILES]
+
+    dnf_q = QueueFactory("dnf")
+    dnf_q.addMessage("repos", 1)        # List of repos to use
+    dnf_q.addMessage("transaction", 2)  # list, queue
+    dnf_q.addMessage("info", 2)         # string, queue
+    dnf_q.addMessage("quit", 0)
+
+    rc = start_dnf_thread(config, dnf_q)
+    if not rc:
+        log.error("Failed to start DNF thread.")
+        return False
 
     # pylint: disable=unused-variable
     # Setup the routes
@@ -523,16 +738,14 @@ def run_bottle_app(config):
     @post('/api/v0/compose')
     def compose():
         # XXX - Eventually this will come from the user
-        url = "https://dl.fedoraproject.org/pub/fedora/linux/releases/24/Everything/x86_64/os/"
+        url = DEFAULT_REPOS[0]
 
         MODULE_URL = 'http://dev.fed-mod.org/modularity/fedora-dev-mod'
         MODULE_NAME = 'fm-httpd'
         import pylorax.modules
         repos, packages = pylorax.modules.parse_module(MODULE_URL, MODULE_NAME)
         packages = list(packages)
-
-        #repos = ["https://dl.fedoraproject.org/pub/fedora/linux/updates/24/x86_64/"]
-        #packages = ["tmux", "screen"]
+        log.debug("packages =  %s", packages)
 
         from time import strftime
         iso_dest = STATIC_FILES+strftime("live-%Y%m%d%H%M.iso")
@@ -541,6 +754,37 @@ def run_bottle_app(config):
             abort(500, "Starting compose failed.")
         else:
             return {}
+
+    @route('/api/v0/dnf/transaction/<packages>')
+    def dnf_transaction(packages=""):
+        """ Return a JSON string with package tuples.
+
+        packages can be a single package or a comma-separated list.
+        """
+        reply_q = new_reply_q()
+        dnf_q.send_transaction(packages.split(","), reply_q)
+
+        (_, args) = reply_q.q.get(True)
+        if len(args) < 1:
+            abort(500, "Transaction for %s failed." % packages)
+        else:
+            return args[0]
+
+    @route('/api/v0/dnf/info/<packages>')
+    def dnf_info(packages=""):
+        """ Return a JSON string with package details.
+
+        packages can be a single packages or a comma-separated list.
+        """
+        reply_q = new_reply_q()
+        dnf_q.send_info(packages.split(","), reply_q)
+
+        (_, args) = reply_q.q.get(True)
+        if len(args) < 1:
+            abort(500, "Info request for %s failed." % packages)
+        else:
+            return args[0]
+
 
     run(host='0.0.0.0', port=config.port, debug=config.debug)
 
@@ -568,13 +812,15 @@ def main():
     lorax_templates = find_templates(share_dir)
 
     tempfile.tempdir = opts.tmp
+    dnf_dir = opts.dnf_dir or tempfile.mkdtemp(prefix="lmc-dnf.")
+    log.info("Using %s for DNF cache, etc.", dnf_dir)
 
     # Setup a config object to pass around
     _cfg = namedtuple("config", ["project", "releasever", "share_dir", "lorax_templates",
                       "domacboot", "dracut_args", "proxy", "logfile", "port", "debug",
-                      "ks_template"])
+                      "ks_template", "dnf_dir"])
     config = _cfg("Fedora", "26", share_dir, lorax_templates, True, DRACUT_DEFAULT,
-                  opts.proxy, opts.logfile, opts.port, opts.debug, opts.ks_template)
+                  opts.proxy, opts.logfile, opts.port, opts.debug, opts.ks_template, dnf_dir)
 
     run_bottle_app(config)
 

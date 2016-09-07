@@ -309,6 +309,8 @@ def lmc_composer_parser(dracut_default=""):
                         help="Enable extra debugging output")
     parser.add_argument("--tmp", default="/var/tmp", type=os.path.abspath,
                         help="Top level temporary directory")
+    parser.add_argument("--dnf-dir", type=os.path.abspath,
+                        help="DNF cache temporary directory")
     parser.add_argument("--proxy", default=None,
                         help="proxy url:port", metavar="HOST")
 
