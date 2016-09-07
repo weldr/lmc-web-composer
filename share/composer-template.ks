@@ -374,27 +374,16 @@ EOF
 %end
 </%text>
 
-%%packages
-@base-x
-@core
-@fonts
-@networkmanager-submodules
-@workstation-product
-gnome-terminal
-aajohan-comfortaa-fonts
+%%packages --nocore
+# liveimg requirements not pulled in via modules
 dracut-config-generic
 dracut-live
-fedora-productimg-workstation
-glibc-all-langpacks
-grub2-efi
-shim
-kernel
-# Make sure that DNF doesn't pull in debug kernel to satisfy kmod() requires
-kernel-modules
-kernel-modules-extra
 memtest86+
 syslinux
 
+# Make sure that DNF doesn't pull in debug kernel to satisfy kmod() requires
+kernel-modules
+kernel-modules-extra
 %for package in packages:
 ${package}
 %endfor
