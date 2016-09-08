@@ -54,6 +54,7 @@ from pylorax.imgutils import copytree
 from pylorax.executils import execWithRedirect, execReadlines
 from pylorax.monitor import LogMonitor
 from pylorax.cmdline import lmc_composer_parser
+import pylorax.modules
 
 from pyanaconda.queuefactory import QueueFactory
 
@@ -735,6 +736,11 @@ def run_bottle_app(config):
     def index():
         return template("index")
 
+    @route('/api/v0/isos')
+    def json_isos():
+        """ Return a JSON string of the isos in the static directory."""
+        return {"isos": [os.path.basename(f) for f in glob.glob(STATIC_FILES+"*.iso")]}
+
     @post('/api/v0/compose')
     def compose():
         # XXX - Eventually this will come from the user
@@ -784,6 +790,21 @@ def run_bottle_app(config):
             abort(500, "Info request for %s failed." % packages)
         else:
             return args[0]
+
+    @route('/api/v0/module/info/<modules>')
+    def module_info(modules=""):
+        """ Return a JSON string with details about the selected module(s).
+
+        modules can be a single module or a comma-separated list.
+        """
+        MODULE_URL = 'http://dev.fed-mod.org/modularity/fedora-dev-mod'
+
+        reply = {}
+        for module in modules.split(","):
+            repos, packages = pylorax.modules.parse_module(MODULE_URL, module)
+            reply[module] = {"repos": repos, "packages": list(packages)}
+
+        return reply
 
 
     run(host='0.0.0.0', port=config.port, debug=config.debug)
