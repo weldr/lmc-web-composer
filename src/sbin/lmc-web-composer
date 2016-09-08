@@ -498,7 +498,13 @@ def run_bottle_app(config):
     # Setup the routes
     @route('/static/<filepath:path>')
     def server_static(filepath):
-        return static_file(filepath, root=STATIC_FILES)
+        # A mimetype of "True" is the default and tells bottle to guess from the
+        # file extension. .iso is not one of those extensions, so help it out a
+        # bit instead of crashing the browswer with millions of bytes of "text".
+        mimetype = True
+        if filepath.endswith('.iso'):
+            mimetype = "application/octet-stream"
+        return static_file(filepath, mimetype=mimetype, root=STATIC_FILES)
 
     @route('/hello')
     @route('/hello/<name>')
