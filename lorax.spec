@@ -48,6 +48,9 @@ Requires:       python3-mako
 Requires:       python3-kickstart
 Requires:       python3-dnf >= 1.1.7
 
+# dnf copr enable @modularity/modulemd
+Requires:       python3-modulemd
+
 
 %if 0%{?fedora}
 # Fedora specific deps

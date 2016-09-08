@@ -518,8 +518,15 @@ def run_bottle_app(config):
     def compose():
         # XXX - Eventually this will come from the user
         url = "https://dl.fedoraproject.org/pub/fedora/linux/releases/24/Everything/x86_64/os/"
-        repos = ["https://dl.fedoraproject.org/pub/fedora/linux/updates/24/x86_64/"]
-        packages = ["tmux", "screen"]
+
+        MODULE_URL = 'http://dev.fed-mod.org/modularity/fedora-dev-mod'
+        MODULE_NAME = 'fm-httpd'
+        import pylorax.modules
+        repos, packages = pylorax.modules.parse_module(MODULE_URL, MODULE_NAME)
+        packages = list(packages)
+
+        #repos = ["https://dl.fedoraproject.org/pub/fedora/linux/updates/24/x86_64/"]
+        #packages = ["tmux", "screen"]
 
         from time import strftime
         iso_dest = STATIC_FILES+strftime("live-%Y%m%d%H%M.iso")
