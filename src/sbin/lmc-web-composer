@@ -810,6 +810,7 @@ def main():
     else:
         share_dir = "/usr/share/lorax"
     lorax_templates = find_templates(share_dir)
+    log.info("lorax_templates = %s", lorax_templates)
 
     tempfile.tempdir = opts.tmp
     dnf_dir = opts.dnf_dir or tempfile.mkdtemp(prefix="lmc-dnf.")
