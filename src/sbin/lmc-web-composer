@@ -519,7 +519,7 @@ def run_bottle_app(config):
         # XXX - Eventually this will come from the user
         url = "https://dl.fedoraproject.org/pub/fedora/linux/releases/24/Everything/x86_64/os/"
 
-        MODULE_URL = 'http://dev.fed-mod.org/modularity/fedora-dev-mod'
+        MODULE_URL = 'http://dev.fed-mod.org/modularity/fedora-24-mod/'
         MODULE_NAME = 'fm-httpd'
         import pylorax.modules
         repos, packages = pylorax.modules.parse_module(MODULE_URL, MODULE_NAME)
