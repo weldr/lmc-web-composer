@@ -67,6 +67,7 @@ RUNTIME = "images/install.img"
 
 DEFAULT_REPOS = ["https://dl.fedoraproject.org/pub/fedora/linux/releases/24/Everything/x86_64/os/",
                  "https://dl.fedoraproject.org/pub/fedora/linux/updates/24/x86_64/"]
+MODULE_REPOS = "http://dev.fed-mod.org/modularity/fedora-24-mod/"
 
 class InstallError(Exception):
     pass
@@ -695,7 +696,7 @@ def run_bottle_app(config):
     list(os.makedirs(p) for p in (TEMPLATE_FILES, STATIC_FILES) if not os.path.exists(p))
 
     import bottle
-    from bottle import abort, post, route, run, static_file
+    from bottle import abort, post, route, run, static_file, request
     from bottle import mako_template as template
     bottle.TEMPLATE_PATH = [TEMPLATE_FILES]
 
@@ -734,7 +735,11 @@ def run_bottle_app(config):
 
     @route('/')
     def index():
-        return template("index")
+        # XXX make URL configurable here, too
+        # XXX using the module "summary" properties could make sense but right
+        # now the summaries are usless
+        module_list = pylorax.modules.parse_json(MODULE_REPOS)
+        return template("index", modules=[m['name'] for m in module_list])
 
     @route('/api/v0/isos')
     def json_isos():
@@ -745,11 +750,13 @@ def run_bottle_app(config):
     def compose():
         # XXX - Eventually this will come from the user
         url = DEFAULT_REPOS[0]
+        module_url = MODULE_REPOS
 
-        MODULE_URL = 'http://dev.fed-mod.org/modularity/fedora-24-mod/'
-        MODULE_NAME = 'fm-httpd'
-        import pylorax.modules
-        repos, packages = pylorax.modules.parse_module(MODULE_URL, MODULE_NAME)
+        module = request.forms.get('module')
+        if not module:
+            abort(500, "No module specified.")
+
+        repos, packages = pylorax.modules.parse_module(module_url, module)
         packages = list(packages)
         log.debug("packages =  %s", packages)
 
