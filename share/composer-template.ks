@@ -12,10 +12,10 @@ timezone US/Eastern
 lang en_US.UTF-8
 # Firewall configuration
 firewall --enabled --service=mdns
-url --url=${url}
+url --url=${url} ${proxy}
 
 %for repo in repos:
-repo --name=extra-${loop.index} --baseurl=${repo}
+repo --name=extra-${loop.index} --baseurl=${repo} ${proxy}
 %endfor
 
 <%text>

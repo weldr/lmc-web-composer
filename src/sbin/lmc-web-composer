@@ -65,8 +65,8 @@ DRACUT_DEFAULT = ["--xz", "--add", "livenet dmsquash-live convertfs pollcdrom qe
 ROOT_PATH = "/mnt/sysimage/"
 RUNTIME = "images/install.img"
 
-DEFAULT_REPOS = ["https://dl.fedoraproject.org/pub/fedora/linux/releases/24/Everything/x86_64/os/",
-                 "https://dl.fedoraproject.org/pub/fedora/linux/updates/24/x86_64/"]
+DEFAULT_REPOS = ["http://dl.fedoraproject.org/pub/fedora/linux/releases/24/Everything/x86_64/os/",
+                 "http://dl.fedoraproject.org/pub/fedora/linux/updates/24/x86_64/"]
 MODULE_REPOS = "http://dev.fed-mod.org/modularity/fedora-24-mod/"
 
 class InstallError(Exception):
@@ -243,7 +243,7 @@ def novirt_install(config, ks_file, disk_img, disk_size):
         os.mkdir(dirinstall_path)
     mount(disk_img, opts="loop", mnt=dirinstall_path)
 
-    log_monitor = LogMonitor(timeout=None)
+    log_monitor = LogMonitor(log_path=config.anaconda_log, timeout=None)
     args += ["--remotelog", "%s:%s" % (log_monitor.host, log_monitor.port)]
 
     # Make sure anaconda has the right product and release
@@ -284,6 +284,8 @@ def novirt_install(config, ks_file, disk_img, disk_size):
         for l in glob.glob("/tmp/*log")+glob.glob("/tmp/anaconda-tb-*"):
             shutil.copy2(l, log_anaconda)
             os.unlink(l)
+        if os.path.exists(config.anaconda_log):
+            os.unlink(config.anaconda_log)
 
         # Make sure any leftover anaconda mounts have been cleaned up
         if not anaconda_cleanup(dirinstall_path):
@@ -458,8 +460,6 @@ def make_novirt_liveiso(config, ks_file, iso_dest):
         os.unlink(disk_img)
         log.info("Disk image erased")
         disk_img = None
-
-    return True
 
 
 def get_dbo(tempdir, repositories, releasever, best):
@@ -658,10 +658,17 @@ def start_compose_thread(config, iso_dest, url, repos=None, packages=None):
     :param url: Primary repo URL
     :param repos: List of extra repositories
     :param packages: List of extra packages
+    :returns: The thread object for the comopose thread
     """
 
     # Construct a kickstart file from a template
-    ks_vars = {"url": url, "repos" : repos or [], "packages": packages or []}
+    if config.proxy:
+        proxy_str = "--proxy=%s" % config.proxy
+    else:
+        proxy_str = ""
+
+    ks_vars = {"url": url, "repos" : repos or [], "packages": packages or [],
+               "proxy": proxy_str}
     try:
         result = Template(filename=config.ks_template).render(**ks_vars)
     except Exception:
@@ -679,7 +686,7 @@ def start_compose_thread(config, iso_dest, url, repos=None, packages=None):
     t.daemon = True
     t.start()
 
-    return True
+    return t
 
 
 def new_reply_q():
@@ -710,6 +717,11 @@ def run_bottle_app(config):
     if not rc:
         log.error("Failed to start DNF thread.")
         return False
+
+    # XXX Total hack to keep track of running compose's thread object
+    compose_lock = threading.Lock()
+    global compose_thread
+    compose_thread = None
 
     # pylint: disable=unused-variable
     # Setup the routes
@@ -762,11 +774,57 @@ def run_bottle_app(config):
 
         from time import strftime
         iso_dest = STATIC_FILES+strftime("live-%Y%m%d%H%M.iso")
-        rc = start_compose_thread(config, iso_dest, url, repos, packages)
-        if not rc:
-            abort(500, "Starting compose failed.")
+        with compose_lock:
+            global compose_thread
+            compose_thread = start_compose_thread(config, iso_dest, url, repos, packages)
+            if not compose_thread:
+                abort(500, "Starting compose failed.")
+            else:
+                return {}
+
+    @route('/api/v0/compose/status')
+    def compose_status():
+        """ Return the current status of the compose
+        """
+        with compose_lock:
+            if not compose_thread:
+                return {"status": "compose not started"}
+            elif compose_thread.is_alive():
+                return {"status": "compose running"}
+            else:
+                return {"status": "compose finished"}
+
+    @route('/api/v0/compose/log/<kbytes:int>')
+    def compose_log(kbytes=5):
+        """ Read the end of the log, starting back <kbytes> from the end.
+
+        It finds the start of the next line, then returns lines up to the
+        current end of the logfile. Last line may not be complete.
+        """
+        if os.path.exists(config.anaconda_log):
+            logfile = config.anaconda_log
+        elif os.path.exists(config.logfile):
+            logfile = config.logfile
         else:
-            return {}
+            return {"lines": []}
+
+        with open(logfile, "r") as f:
+            f.seek(0, 2)
+            end = f.tell()
+            if end < 1024 * kbytes:
+                seek_to = 0
+            else:
+                seek_to = end - (1024 * kbytes)
+            f.seek(seek_to, 0)
+            f.readline()
+            return {"lines": f.readlines()}
+
+    @post('/api/v0/compose/cancel')
+    def compose_kill():
+        """ Cancel the running compose, if there is one.
+        """
+
+        abort(500, "Not Implemented yet")
 
     @route('/api/v0/dnf/transaction/<packages>')
     def dnf_transaction(packages=""):
@@ -851,14 +909,21 @@ def main():
 
     tempfile.tempdir = opts.tmp
     dnf_dir = opts.dnf_dir or tempfile.mkdtemp(prefix="lmc-dnf.")
+    if not os.path.exists(dnf_dir):
+        os.makedirs(dnf_dir)
     log.info("Using %s for DNF cache, etc.", dnf_dir)
+
+    # XXX need to clean this up later
+    anaconda_log = tempfile.mktemp(prefix="lmc-anaconda.", suffix=".log")
+    log.info("Using %s to store logs from anaconda", anaconda_log)
 
     # Setup a config object to pass around
     _cfg = namedtuple("config", ["project", "releasever", "share_dir", "lorax_templates",
                       "domacboot", "dracut_args", "proxy", "logfile", "port", "debug",
-                      "ks_template", "dnf_dir"])
+                      "ks_template", "dnf_dir", "anaconda_log"])
     config = _cfg("Fedora", "26", share_dir, lorax_templates, True, DRACUT_DEFAULT,
-                  opts.proxy, opts.logfile, opts.port, opts.debug, opts.ks_template, dnf_dir)
+                  opts.proxy, opts.logfile, opts.port, opts.debug, opts.ks_template, dnf_dir,
+                  anaconda_log)
 
     run_bottle_app(config)
 
