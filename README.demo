@@ -13,7 +13,8 @@ them from the lorax.spec file.  Install anaconda-core and anaconda-tui
 
 Run it, as root, from the working directory like so:
 
-PYTHONPATH=./src/ ./src/sbin/lmc-web-composer --debug --ks-template=./share/composer-template.ks
+PYTHONPATH=./src/ ./src/sbin/lmc-web-composer --debug --ks-template=./share/composer-template.ks \
+--lorax-templates=./share/
 
 Add a --proxy if you have one, it'll speed things up when you have to rerun it.
 
@@ -40,3 +41,41 @@ Some things that need to be figured out:
 5. Tell the UI when the compose finished and where to find the final iso.
 6. Lock the compose so that it won't run more than one at a time.
 7. Lock the dnf API while metadata is being downloaded.
+
+
+API Documentation
+=================
+
+The API is available from /api/v0/ and the available methods are:
+
+* POST /api/v0/compose
+  This takes a single parameter, "module", which is the name of the module to compose.
+  The result will be written to /static/live-<date+time>.iso when it is finished.
+  Currently there is no way to monitor the compose progress (TODO)
+  Make sure that the previous compose has finished before calling this again. Currently
+  there is nothing preventing this (TODO).
+
+* GET /api/v0/isos
+  Returns a list of the available composed ISO as a JSON object
+  {"iso" : [iso1, iso2, ...]}. The isos themselves are accessible as /static/iso1, etc.
+
+* GET /api/v0/module/list
+  This returns a JSON object of the form {"modules": <list>} with information on all
+  the modules that the composer knows about. The useful parts of the objects in the
+  list are probably "name" and "summary".
+
+* GET /api/v0/module/info/<module-list>
+  This accepts a comma separated list of module names and returns a JSON object of the
+  form: {"MODULE-NAME": {"packages": [list of packages]}, ...}
+  eg. {"fm-httpd": {"packages": ["shared-mime-info", "pam", ...]}}
+
+* GET /api/v0/dnf/transaction/<package list>
+  This accepts a comma separated list of rpm package names and returns a JSON object
+  of the form {"packages": <list>} with a list of all package tuples that would be
+  included in a dnf transaction that selects the packages in <package list>. eg.
+  {"packages": [["gzip", "x86_64", "0", "1.6", "10.fc24"], ...]}
+
+* GET /api/v0/dnf/info/<package list>
+  This accepts a comma separated list of rpm package names and returns a JSON object
+  with information about the listed packages using the form: {"package-name": {"files": ...}}
+  eg. {"pam": {"url": "http://www.linux-pam.org/", "size": 742158, ...}}
