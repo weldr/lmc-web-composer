@@ -752,11 +752,18 @@ def run_bottle_app(config):
         url = DEFAULT_REPOS[0]
         module_url = MODULE_REPOS
 
-        module = request.forms.get('module')
-        if not module:
+        module_list = request.forms.getall('module')
+        if not module_list:
             abort(500, "No module specified.")
 
-        repos, packages = pylorax.modules.parse_module(module_url, module)
+        repos = set()
+        packages = set()
+        for module in module_list:
+            mod_repos, mod_packages = pylorax.modules.parse_module(module_url, module)
+            repos.update(mod_repos)
+            packages.update(mod_packages)
+
+        repos = list(repos)
         packages = list(packages)
         log.debug("packages =  %s", packages)
 
