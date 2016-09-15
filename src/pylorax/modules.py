@@ -186,7 +186,7 @@ def parse_module(baseurl, module_name):
         # Only keep the package names and throw out the -evra part.
         if 'default' in mmd.profiles:
             pkgs.update(_split_nevra(p) for p in mmd.profiles['default'].rpms)
-        else:
+        elif mmd.components is not None:
             pkgs.update(_split_nevra(p) for p in mmd.components.rpms.packages.keys())
 
         return (repos, pkgs)
