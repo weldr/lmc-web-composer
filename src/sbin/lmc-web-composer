@@ -887,11 +887,9 @@ def run_bottle_app(config):
 
         modules can be a single module or a comma-separated list.
         """
-        MODULE_URL = 'http://dev.fed-mod.org/modularity/fedora-dev-mod'
-
         reply = {}
         for module in modules.split(","):
-            repos, packages = pylorax.modules.parse_module(MODULE_URL, module)
+            repos, packages = pylorax.modules.parse_module(MODULE_REPOS, module)
             reply[module] = {"repos": repos, "packages": list(packages)}
 
         return reply
