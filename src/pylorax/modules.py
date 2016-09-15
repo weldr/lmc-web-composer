@@ -152,11 +152,7 @@ def parse_module(baseurl, module_name):
 
         return match.group(1)
 
-        try:
-            return nevra_re.match(nevra).groups()
-        except AttributeError as e:
-            print("wha? %s" % nevra)
-            raise
+        return nevra_re.match(nevra).groups()
 
     # Recursive function to parse a module and its requirements
     def _enable_mod(baseurl, module_name, module_json):
@@ -190,7 +186,7 @@ def parse_module(baseurl, module_name):
         # Only keep the package names and throw out the -evra part.
         if 'default' in mmd.profiles:
             pkgs.update(_split_nevra(p) for p in mmd.profiles['default'].rpms)
-        else:
+        elif mmd.components is not None:
             pkgs.update(_split_nevra(p) for p in mmd.components.rpms.packages.keys())
 
         return (repos, pkgs)

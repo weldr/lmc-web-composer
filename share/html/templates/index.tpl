@@ -1,7 +1,7 @@
 Welcome to the composer demo.
 
 <form action="/api/v0/compose" method="POST">
-     <select name="module">
+     <select name="module" multiple>
 %for module in modules:
          <option value=${module}>${module}</option>
 %endfor
