@@ -95,4 +95,7 @@ The API is available from /api/v0/ and the available methods are:
 
 * POST /api/v0/compose/cancel
   Cancel the currently running compose
-  NOT IMPLEMENTED (TODO)
+  This will terminate anaconda, if it is running, but will not stop
+  it after that point (mksquashfs and creation of the iso). It may
+  take a few seconds for the cancel to have any effect. /status will
+  indicate that the compose has finished after it has been terminated.

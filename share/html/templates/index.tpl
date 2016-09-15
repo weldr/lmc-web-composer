@@ -8,3 +8,7 @@ Welcome to the composer demo.
      </select>
      <input type="submit" value="BIG RED BUTTON">
 </form>
+
+<form action="/api/v0/compose/cancel" method="POST">
+     <input type="submit" value="CANCEL COMPOSE">
+</form>

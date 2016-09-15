@@ -32,6 +32,7 @@ import threading
 from collections import namedtuple
 import dnf
 from binascii import hexlify
+import queue
 
 # Use pykickstart to calculate disk image size
 from pykickstart.parser import KickstartParser
@@ -169,12 +170,13 @@ def make_livecd(config, mount_dir, work_dir):
     return work_dir
 
 
-def novirt_log_check(log_check, proc):
+def novirt_log_check(log_check, proc, cancel_q):
     """
     Check to see if there has been an error in the logs
 
     :param log_check: method to call to check for an error in the logs
     :param proc: Popen object for the anaconda process
+    :param cancel_q: QueueFactory object to check for a cancel command
     :returns: True if the process has been terminated
 
     The log_check method should return a True if an error has been detected.
@@ -183,6 +185,18 @@ def novirt_log_check(log_check, proc):
     if log_check():
         proc.terminate()
         return True
+
+    if not cancel_q:
+        return False
+
+    try:
+        (code, args) = cancel_q.q.get(False)
+        if code == cancel_q.CANCEL_CODE_CANCEL:
+            proc.terminate()
+            return True
+    except queue.Empty:
+        pass
+
     return False
 
 
@@ -214,7 +228,7 @@ def anaconda_cleanup(dirinstall_path):
     return rc
 
 
-def novirt_install(config, ks_file, disk_img, disk_size):
+def novirt_install(config, ks_file, disk_img, disk_size, cancel_q):
     """
     Use Anaconda to install to a disk image
 
@@ -252,7 +266,7 @@ def novirt_install(config, ks_file, disk_img, disk_size):
         for line in execReadlines("anaconda", args, reset_lang=False,
                                   env_add={"ANACONDA_PRODUCTNAME": config.project,
                                            "ANACONDA_PRODUCTVERSION": config.releasever},
-                                  callback=lambda p: not novirt_log_check(log_monitor.server.log_check, p)):
+                                  callback=lambda p: not novirt_log_check(log_monitor.server.log_check, p, cancel_q)):
             log.info(line)
 
         # Make sure the new filesystem is correctly labeled
@@ -344,7 +358,7 @@ def calculate_disk_size(ks):
     return disk_size
 
 
-def make_image(config, ks_file):
+def make_image(config, ks_file, cancel_q):
     """
     Install to a disk image
 
@@ -392,7 +406,7 @@ def make_image(config, ks_file):
     log.info("disk_img = %s", disk_img)
     disk_size = calculate_disk_size(ks)
     try:
-        novirt_install(config, ks_file, disk_img, disk_size)
+        novirt_install(config, ks_file, disk_img, disk_size, cancel_q)
     except InstallError as e:
         log.error("Install failed: %s", e)
         log.info("Removing bad disk image")
@@ -417,7 +431,7 @@ def default_image_name(compression, basename):
 
 
 
-def make_novirt_liveiso(config, ks_file, iso_dest):
+def make_novirt_liveiso(config, ks_file, iso_dest, cancel_q):
     """ Run anaconda to build a live iso
 
     :param ks_file: Path to kickstart file
@@ -425,7 +439,7 @@ def make_novirt_liveiso(config, ks_file, iso_dest):
     """
     # Make the image. Output of this is either a partitioned disk image or a fsimage
     try:
-        disk_img = make_image(config, ks_file)
+        disk_img = make_image(config, ks_file, cancel_q)
     except InstallError as e:
         log.error("ERROR: Image creation failed: %s", e)
         return False
@@ -652,7 +666,7 @@ def start_dnf_thread(config, dnf_q):
     return True
 
 
-def start_compose_thread(config, iso_dest, url, repos=None, packages=None):
+def start_compose_thread(config, iso_dest, url, repos=None, packages=None, cancel_q=None):
     """ Start a thread running the compose
 
     :param url: Primary repo URL
@@ -682,7 +696,7 @@ def start_compose_thread(config, iso_dest, url, repos=None, packages=None):
     log.info("Wrote kickstart to %s", tmp_ks)
 
     # XXX - How are we going to monitor this? Stop it? Tell when it is done?
-    t = threading.Thread(target=make_novirt_liveiso, args=(config, tmp_ks, iso_dest))
+    t = threading.Thread(target=make_novirt_liveiso, args=(config, tmp_ks, iso_dest, cancel_q))
     t.daemon = True
     t.start()
 
@@ -722,6 +736,10 @@ def run_bottle_app(config):
     compose_lock = threading.Lock()
     global compose_thread
     compose_thread = None
+
+    # A queue to cancel running the Anaconda process
+    cancel_q = QueueFactory("cancel")
+    cancel_q.addMessage("cancel", 0)
 
     # pylint: disable=unused-variable
     # Setup the routes
@@ -776,7 +794,7 @@ def run_bottle_app(config):
         iso_dest = STATIC_FILES+strftime("live-%Y%m%d%H%M.iso")
         with compose_lock:
             global compose_thread
-            compose_thread = start_compose_thread(config, iso_dest, url, repos, packages)
+            compose_thread = start_compose_thread(config, iso_dest, url, repos, packages, cancel_q)
             if not compose_thread:
                 abort(500, "Starting compose failed.")
             else:
@@ -823,8 +841,8 @@ def run_bottle_app(config):
     def compose_kill():
         """ Cancel the running compose, if there is one.
         """
-
-        abort(500, "Not Implemented yet")
+        cancel_q.send_cancel()
+        return {}
 
     @route('/api/v0/dnf/transaction/<packages>')
     def dnf_transaction(packages=""):
