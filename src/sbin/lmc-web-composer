@@ -68,7 +68,8 @@ RUNTIME = "images/install.img"
 
 DEFAULT_REPOS = ["http://dl.fedoraproject.org/pub/fedora/linux/releases/24/Everything/x86_64/os/",
                  "http://dl.fedoraproject.org/pub/fedora/linux/updates/24/x86_64/"]
-MODULE_REPOS = "http://dev.fed-mod.org/modularity/fedora-24-mod/"
+#MODULE_REPOS = "http://dev.fed-mod.org/modularity/fedora-24-mod/"
+MODULE_REPOS = "http://newcutlet.install.bos.redhat.com/pub/fedora-modularity/fedora-24-mod/"
 
 class InstallError(Exception):
     pass
