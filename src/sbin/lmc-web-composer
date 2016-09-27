@@ -716,6 +716,11 @@ def run_bottle_app(config):
     STATIC_FILES = config.share_dir+"/html/static/"
     list(os.makedirs(p) for p in (TEMPLATE_FILES, STATIC_FILES) if not os.path.exists(p))
 
+    # Supported compose types
+    COMPOSE_TYPES = {"iso": True, "disk-image": False, "fs-image": False, "ami": False,
+                     "tar": False, "live-pxe": False, "live-ostree": False, "oci": False,
+                     "vagrant": False, "qcow2": False, "vmdk": False, "vhdx": False}
+
     import bottle
     from bottle import abort, post, route, run, static_file, request
     from bottle import mako_template as template
@@ -786,6 +791,11 @@ def run_bottle_app(config):
         if not module_list:
             abort(500, "No module specified.")
 
+        # NOTE: compose_type is not actually used for the compose
+        compose_type = request.forms.get('type')
+        if not compose_type or not COMPOSE_TYPES.get(compose_type, False):
+            abort(500, "%s is not a supported compose type." % compose_type)
+
         repos = set()
         packages = set()
         for module in module_list:
@@ -818,6 +828,12 @@ def run_bottle_app(config):
                 return {"status": "compose running"}
             else:
                 return {"status": "compose finished"}
+
+    @route("/api/v0/compose/types")
+    def compose_types():
+        """ Return the supported compose types
+        """
+        return COMPOSE_TYPES
 
     @route('/api/v0/compose/log/<kbytes:int>')
     def compose_log(kbytes=5):

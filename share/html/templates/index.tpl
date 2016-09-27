@@ -6,6 +6,7 @@ Welcome to the composer demo.
          <option value=${module}>${module}</option>
 %endfor
      </select>
+     <input type="hidden" name="type" value="iso">
      <input type="submit" value="BIG RED BUTTON">
 </form>
 

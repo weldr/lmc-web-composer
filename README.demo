@@ -49,11 +49,36 @@ API Documentation
 The API is available from /api/v0/ and the available methods are:
 
 * POST /api/v0/compose
-  This takes a single parameter, "module", which is the name of the module to compose.
+  This takes a parameter, "module", which is the name of the module to compose.
   The result will be written to /static/live-<date+time>.iso when it is finished.
-  Currently there is no way to monitor the compose progress (TODO)
+  The default is to compose a live iso, this can be changed by passing the "type"
+  parameter and one of the supported types returned by the /compose/types API call.
   Make sure that the previous compose has finished before calling this again. Currently
   there is nothing preventing this (TODO).
+
+* GET /api/v0/compose/log/<kbytes>
+  Read the end of the log, starting back <kbytes> from the end. It will
+  find the start of the next line and return all the lines up to the end
+  of the file.
+
+  This will return lines from the lmc-web-compose log when anaconda is
+  not running, and when anaconda is running it will return lines from
+  anaconda's logs.
+
+* GET /api/v0/compose/status
+  Returns a JSON object with one of 3 possible statuses:
+  "compose not started", "compose running", and "compose finished"
+
+* POST /api/v0/compose/cancel
+  Cancel the currently running compose
+  This will terminate anaconda, if it is running, but will not stop
+  it after that point (mksquashfs and creation of the iso). It may
+  take a few seconds for the cancel to have any effect. /status will
+  indicate that the compose has finished after it has been terminated.
+
+* GET /api/v0/compose/types
+  Returns a JSON object with the possible compose types and their support
+  status (true or false) for the composer instance. eg. {"iso": true, ...}
 
 * GET /api/v0/isos
   Returns a list of the available composed ISO as a JSON object
@@ -80,22 +105,4 @@ The API is available from /api/v0/ and the available methods are:
   with information about the listed packages using the form: {"package-name": {"files": ...}}
   eg. {"pam": {"url": "http://www.linux-pam.org/", "size": 742158, ...}}
 
-* GET /api/v0/compose/log/<kbytes>
-  Read the end of the log, starting back <kbytes> from the end. It will
-  find the start of the next line and return all the lines up to the end
-  of the file.
 
-  This will return lines from the lmc-web-compose log when anaconda is
-  not running, and when anaconda is running it will return lines from
-  anaconda's logs.
-
-* GET /api/v0/compose/status
-  Returns a JSON object with one of 3 possible statuses:
-  "compose not started", "compose running", and "compose finished"
-
-* POST /api/v0/compose/cancel
-  Cancel the currently running compose
-  This will terminate anaconda, if it is running, but will not stop
-  it after that point (mksquashfs and creation of the iso). It may
-  take a few seconds for the cancel to have any effect. /status will
-  indicate that the compose has finished after it has been terminated.
