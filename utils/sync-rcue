@@ -1,0 +1,24 @@
+#!/usr/bin/sh
+
+if [ -z $1 ]; then
+    echo "Missing path to rcue code"
+    exit 1
+fi
+
+if [ ! -e "$1/node_modules/" ]; then
+    echo "Missing node_modules. You need to run npm install in the $1 path"
+    exit 1
+fi
+
+if [ ! -e "./share/" ]; then
+    echo "Run this from the top of the composer source tree."
+    exit 1
+fi
+
+mkdir ./share/rcue
+rsync -aP $1/assets/ ./share/rcue/assets/
+rsync -aP $1/dist/ ./share/rcue/dist/
+rsync -aP $1/*html ./share/rcue/html/
+rsync -aP $1/*js ./share/rcue/html/
+rsync -aP $1/*css ./share/rcue/html/
+rsync -aP $1/node_modules/ ./share/rcue/node_modules/

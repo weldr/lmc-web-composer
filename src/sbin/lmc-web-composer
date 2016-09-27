@@ -717,7 +717,9 @@ def run_bottle_app(config):
     """ Run the web application"""
     TEMPLATE_FILES = config.share_dir+"/html/templates/"
     STATIC_FILES = config.share_dir+"/html/static/"
-    list(os.makedirs(p) for p in (TEMPLATE_FILES, STATIC_FILES) if not os.path.exists(p))
+    RCUE_FILES = config.share_dir+"/rcue/"
+    REQUIRED_DIRS = (TEMPLATE_FILES, STATIC_FILES, RCUE_FILES)
+    list(os.makedirs(p) for p in REQUIRED_DIRS if not os.path.exists(p))
 
     # Supported compose types
     COMPOSE_TYPES = {"iso": True, "disk-image": False, "fs-image": False, "ami": False,
@@ -789,6 +791,23 @@ def run_bottle_app(config):
         if filepath.endswith('.iso'):
             mimetype = "application/octet-stream"
         return static_file(filepath, mimetype=mimetype, root=STATIC_FILES)
+
+    # Static files for the rcue framework
+    @route('/dist/<filepath:path>')
+    def rcue_dist(filepath):
+        return static_file(filepath, root=RCUE_FILES+"dist/")
+
+    @route('/node_modules/<filepath:path>')
+    def rcue_node_modules(filepath):
+        return static_file(filepath, root=RCUE_FILES+"node_modules/")
+
+    @route('/assets/<filepath:path>')
+    def rcue_assets(filepath):
+        return static_file(filepath, root=RCUE_FILES+"assets/")
+
+    @route('/<filename:re:.*\.(html|css|js)>')
+    def rcue_html(filename):
+        return static_file(filename, root=RCUE_FILES+"html/")
 
     @route('/hello')
     @route('/hello/<name>')
