@@ -725,7 +725,7 @@ def run_bottle_app(config):
                      "vagrant": False, "qcow2": False, "vmdk": False, "vhdx": False}
 
     import bottle
-    from bottle import abort, post, route, run, static_file, request
+    from bottle import abort, post, get, route, run, static_file, request, response
     from bottle import mako_template as template
     bottle.TEMPLATE_PATH = [TEMPLATE_FILES]
 
@@ -762,6 +762,21 @@ def run_bottle_app(config):
         log.error("Failed to find a valid module repo: %s", MODULE_REPOS)
         return False
     log.info("MODULE_REPO = %s", MODULE_REPO)
+
+    # A map of running and finished composes
+    # values are compose objects, defined below
+    compose_map = {}
+
+    # Use itertools.count as a hand-wavily thread safe id generator
+    from itertools import count
+    compose_id_generator = count(1)
+
+    # This is what gets saved per-compose
+    class Compose(object):
+        def __init__(self, compose_id, compose_thread, iso_dest):
+            self.compose_id = compose_id
+            self.compose_thread = compose_thread
+            self.iso_dest = iso_dest
 
     # pylint: disable=unused-variable
     # Setup the routes
@@ -828,11 +843,24 @@ def run_bottle_app(config):
         iso_dest = STATIC_FILES+strftime("live-%Y%m%d%H%M.iso")
         with compose_lock:
             global compose_thread
+
+            # If a compose is already running, fail
+            if compose_thread and compose_thread.is_alive():
+                abort(500, "Compose already running.")
+
             compose_thread = start_compose_thread(config, iso_dest, url, repos, packages, cancel_q)
             if not compose_thread:
                 abort(500, "Starting compose failed.")
             else:
-                return {}
+                # Send a 202 with a link to the progress URL
+                compose_id = next(compose_id_generator)
+                compose_map[compose_id] = Compose(compose_id, compose_thread, iso_dest)
+
+                response.status = 202
+                response.headers["Location"] = "/api/v0/compose/status/%d" % compose_id
+
+                # Return a payload with the location so a browser user gets to see something
+                return {"Location": response.headers["Location"]}
 
     @route('/api/v0/compose/status')
     def compose_status():
@@ -845,6 +873,37 @@ def run_bottle_app(config):
                 return {"status": "compose running"}
             else:
                 return {"status": "compose finished"}
+
+    @get("/api/v0/compose/status/<compose_id:int>")
+    def compose_id_status(compose_id):
+        # does this compose exist?
+        if compose_id not in compose_map:
+            abort(404, "No such compose")
+
+        compose = compose_map[compose_id]
+
+        # if so, is it done?
+        # if compose_thread points to a finished thread, clean it up
+        with compose_lock:
+            if compose.compose_thread:
+                # if the thread is finished, clean it up
+                if not compose.compose_thread.is_alive():
+                    compose.compose_thread.join()
+                    compose.compose_thread = None
+                # otherwise, return that the compose is still in progress
+                else:
+                    return {"compose_id" : compose_id, "status" : "compose running"}
+
+            # compose is no longer running. link to the iso.
+            # NB: some REST thinkers would say to return a 303 to the ISO at this point,
+            # but having a GET that returns either a JSON blob or an ISO would be insane
+            if os.path.exists(compose.iso_dest):
+                return {"compose_id": compose_id,
+                        "status": "compose finished",
+                        "image": "/static/" + os.path.basename(compose.iso_dest)}
+            # otherwise, compose failed
+            else:
+                return {"compose_id" : compose_id, "status" : "compose failed"}
 
     @route("/api/v0/compose/types")
     def compose_types():
