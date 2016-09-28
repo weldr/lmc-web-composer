@@ -33,6 +33,7 @@ from collections import namedtuple
 import dnf
 from binascii import hexlify
 import queue
+import requests
 
 # Use pykickstart to calculate disk image size
 from pykickstart.parser import KickstartParser
@@ -68,8 +69,9 @@ RUNTIME = "images/install.img"
 
 DEFAULT_REPOS = ["http://dl.fedoraproject.org/pub/fedora/linux/releases/24/Everything/x86_64/os/",
                  "http://dl.fedoraproject.org/pub/fedora/linux/updates/24/x86_64/"]
-#MODULE_REPOS = "http://dev.fed-mod.org/modularity/fedora-24-mod/"
-MODULE_REPOS = "http://newcutlet.install.bos.redhat.com/pub/fedora-modularity/fedora-24-mod/"
+MODULE_REPOS = ["http://newcutlet.install.bos.redhat.com/pub/fedora-modularity/fedora-24-mod/",
+                "http://dev.fed-mod.org/modularity/fedora-24-mod/"]
+
 
 class InstallError(Exception):
     pass
@@ -747,6 +749,20 @@ def run_bottle_app(config):
     cancel_q = QueueFactory("cancel")
     cancel_q.addMessage("cancel", 0)
 
+    # Determine which module repo to use (newcutlet may not always be reachable)
+    for url in MODULE_REPOS:
+        try:
+            requests.head(url)
+        except requests.exceptions.ConnectionError:
+            continue
+        else:
+            MODULE_REPO = url
+            break
+    else:
+        log.error("Failed to find a valid module repo: %s", MODULE_REPOS)
+        return False
+    log.info("MODULE_REPO = %s", MODULE_REPO)
+
     # pylint: disable=unused-variable
     # Setup the routes
     @route('/static/<filepath:path>')
@@ -774,7 +790,7 @@ def run_bottle_app(config):
         # XXX make URL configurable here, too
         # XXX using the module "summary" properties could make sense but right
         # now the summaries are usless
-        module_list = pylorax.modules.parse_json(MODULE_REPOS)
+        module_list = pylorax.modules.parse_json(MODULE_REPO)
         return template("index", modules=[m['name'] for m in module_list])
 
     @route('/api/v0/isos')
@@ -786,7 +802,7 @@ def run_bottle_app(config):
     def compose():
         # XXX - Eventually this will come from the user
         url = DEFAULT_REPOS[0]
-        module_url = MODULE_REPOS
+        module_url = MODULE_REPO
 
         module_list = request.forms.getall('module')
         if not module_list:
@@ -906,7 +922,7 @@ def run_bottle_app(config):
         """
         reply = {}
         for module in modules.split(","):
-            repos, packages = pylorax.modules.parse_module(MODULE_REPOS, module)
+            repos, packages = pylorax.modules.parse_module(MODULE_REPO, module)
             reply[module] = {"repos": repos, "packages": list(packages)}
 
         return reply
@@ -918,7 +934,7 @@ def run_bottle_app(config):
             This is parse_json, accessible through the API, and converted to
             a format that bottle can deal with.
         """
-        module_list = pylorax.modules.parse_json(MODULE_REPOS)
+        module_list = pylorax.modules.parse_json(MODULE_REPO)
         return {"modules" : module_list}
 
     run(host='0.0.0.0', port=config.port, debug=config.debug)
