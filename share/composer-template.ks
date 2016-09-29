@@ -379,3 +379,12 @@ ${package}
 %endfor
 
 %%end
+
+%%post --interpreter /usr/bin/python3 --nochroot
+import json
+from subprocess import check_output
+
+with open("/mnt/sysimage/root/composer.bom", "w") as fp:
+    pkgs = check_output(["rpm", "--root", "/mnt/sysimage", "-q", "-a"]).decode("utf-8").split()
+    json.dump({"packages": pkgs}, fp)
+%%end
