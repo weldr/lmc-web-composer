@@ -727,7 +727,7 @@ def run_bottle_app(config):
                      "vagrant": False, "qcow2": False, "vmdk": False, "vhdx": False}
 
     import bottle
-    from bottle import abort, post, get, route, run, static_file, request, response
+    from bottle import abort, post, get, route, run, static_file, request, response, hook
     from bottle import mako_template as template
     bottle.TEMPLATE_PATH = [TEMPLATE_FILES]
 
@@ -779,6 +779,11 @@ def run_bottle_app(config):
             self.compose_id = compose_id
             self.compose_thread = compose_thread
             self.iso_dest = iso_dest
+
+    # Enable CORS on all responses
+    @hook('after_request')
+    def enable_cors():
+        response.headers['Access-Control-Allow-Origin'] = '*'
 
     # pylint: disable=unused-variable
     # Setup the routes
