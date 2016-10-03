@@ -1,7 +1,7 @@
 # A CentOS7 Stack image using upstream repo
 FROM fedora:24
 MAINTAINER Brian C. Lane <bcl@redhat.com>
-RUN dnf -y install dnf-plugins-core && dnf -y copr enable @modularity/modulemd && dnf -y install lorax anaconda-tui python3-bottle python3-modulemd gnupg tar
+RUN dnf -y install dnf-plugins-core && dnf -y copr enable @modularity/modulemd && dnf -y install lorax anaconda-tui python3-bottle python3-modulemd gnupg tar git
 
 # Based on official node docker image
 # gpg keys listed at https://github.com/nodejs/node
@@ -35,8 +35,7 @@ RUN echo 'PATH=/usr/local/bin/:$PATH' >> /etc/bashrc
 COPY . /root/lmc-composer-demo/
 
 # Update node dependencies
-RUN cd /root/lmc-composer-demo/composer-UI/ && npm install
-RUN cd /root/lmc-composer-demo && ./utils/sync-rcue ./composer-UI/
+RUN cd /root/lmc-composer-demo/share/composer-UI/ && npm install
 
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
