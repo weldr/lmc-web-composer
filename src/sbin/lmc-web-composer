@@ -843,7 +843,7 @@ def run_bottle_app(config):
         url = DEFAULT_REPOS[0]
         module_url = MODULE_REPO
 
-        module_list = request.forms.getall('module')
+        module_list = request.forms.getall('module[]')
         if not module_list:
             abort(500, "No module specified.")
 
