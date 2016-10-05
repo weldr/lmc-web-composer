@@ -1,0 +1,47 @@
+{
+  "name": "rcue",
+  "version": "3.10.0",
+  "author": "Red Hat",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "angular": "1.3.0 - 1.5.*",
+    "angular-animate": "1.3.0 - 1.5.*",
+    "angular-sanitize": "1.3.0 - 1.5.*",
+    "angular-ui-bootstrap": "^1.1.2",
+    "bootstrap": "^3.3.7",
+    "bootstrap-datepicker": "^1.6.4",
+    "bootstrap-select": "^1.11.2",
+    "c3": "^0.4.11",
+    "d3": "^3.5.17",
+    "datatables": "^1.10.12",
+    "datatables.net-colreorder": "^1.3.2",
+    "drmonty-datatables-colvis": "^1.1.2",
+    "jquery": "^3.1.1",
+    "lodash": "^4.16.3",
+    "patternfly": "~3.10.0",
+    "patternfly-bootstrap-combobox": "^1.1.7",
+    "patternfly-bootstrap-treeview": "^2.1.0",
+    "webpack": "^1.13.2"
+  },
+  "devDependencies": {
+    "connect-livereload": "~0.3.0",
+    "grunt": "~0.4.1",
+    "grunt-contrib-connect": "~0.5.0",
+    "grunt-contrib-copy": "^0.8.1",
+    "grunt-contrib-cssmin": "^0.12.3",
+    "grunt-contrib-less": "^1.0.1",
+    "grunt-contrib-watch": "~0.5.3",
+    "grunt-css-count": "^0.3.0",
+    "grunt-jekyll": "^0.4.2",
+    "matchdep": "~0.3.0"
+  },
+  "description": "The [Red Hat Common User Experience (RCUE)](http://rcue-uxd.itos.redhat.com/) project was created to promote design commonality across all of Red Hat’s Enterprise product offerings.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/patternfly/rcue.git"
+  },
+  "bugs": {
+    "url": "https://github.com/patternfly/rcue/issues"
+  },
+  "homepage": "https://github.com/patternfly/rcue"
+}
