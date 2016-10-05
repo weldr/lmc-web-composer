@@ -1,0 +1,31 @@
+Running the Demo with Docker
+============================
+
+1. Install Docker on your system.
+
+2. Clone this repo and run the following:
+
+   sudo docker build -t <user>/composer .
+   sudo docker run -it --rm -p 8080:80 --privileged <user>/composer
+
+3. Point web browser to localhost:8080
+
+
+Using local UI files with the API running in Docker
+===================================================
+
+1. Edit composer-api.js and set composer_api_host to:
+   "http://localhost:8080"
+
+   Try not to commit that change :)
+
+2. Run 'grunt build'
+
+3. Run 'grunt server'
+
+4. Browse to http://localhost:9001/EditRecipe-angjs.html
+
+If grunt server results in complaints about call stack size edit the
+Gruntfile.js file and remove unneeded paths from the watch section. It appears
+that too many files can cause a problem.
+
