@@ -718,7 +718,8 @@ def run_bottle_app(config):
     TEMPLATE_FILES = config.share_dir+"/html/templates/"
     STATIC_FILES = config.share_dir+"/html/static/"
     UI_FILES = config.share_dir+"/composer-UI/"
-    REQUIRED_DIRS = (TEMPLATE_FILES, STATIC_FILES, UI_FILES)
+    RECIPE_FILES = config.share_dir+"/recipes/"
+    REQUIRED_DIRS = (TEMPLATE_FILES, STATIC_FILES, UI_FILES, RECIPE_FILES)
     list(os.makedirs(p) for p in REQUIRED_DIRS if not os.path.exists(p))
 
     # Supported compose types
@@ -1020,6 +1021,44 @@ def run_bottle_app(config):
         """
         module_list = pylorax.modules.parse_json(MODULE_REPO)
         return {"modules" : module_list}
+
+    @route('/api/v0/recipe/list')
+    def recipe_list():
+        """ Return a JSON string with a list of available recipes.
+
+        eg. {"recipes": ["apache+mysql", "cabal"]}
+        """
+        files = [os.path.basename(f) for f in glob.glob(RECIPE_FILES+"*")]
+        return {"recipes" : files}
+
+    @get('/api/v0/recipe/<names>')
+    def get_recipe(names=""):
+        """ Return a JSON string with the content of the recipes
+
+        eg. {"apache+mysql": '["recipe"]\napache\nmysql\n', ...}
+        """
+        recipes_json = {}
+        for recipe in names.split(","):
+            recipe_path = RECIPE_FILES+os.path.basename(recipe)
+            if os.path.exists(recipe_path):
+                recipes_json[recipe] = open(recipe_path).read()
+
+        return recipes_json
+
+    @post('/api/v0/recipe/<name>')
+    def save_recipe(name=""):
+        """ Store the recipe using the provided name.
+
+        The recipe text is received from the form as 'recipe'
+
+        If the recipe name already exists, it is overwritten.
+        """
+        if name == "list":
+            abort(500, "'list' is not a valid recipe name.")
+
+        recipe_path = RECIPE_FILES+os.path.basename(name)
+        with open(recipe_path, "w") as f:
+            f.write(request.forms.get('recipe'))
 
     run(host='0.0.0.0', port=config.port, debug=config.debug)
 

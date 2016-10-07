@@ -117,4 +117,16 @@ The API is available from /api/v0/ and the available methods are:
   with information about the listed packages using the form: {"package-name": {"files": ...}}
   eg. {"pam": {"url": "http://www.linux-pam.org/", "size": 742158, ...}}
 
+* GET /api/v0/recipe/list
+  This returns a JSON object of the form {"recipes": ["apache+mysql", "cabal"]} which
+  is a list of the available recipes.
+
+* GET /api/v0/recipe/<names>
+  Return a JSON object with the content of the recipe(s). names can be a single
+  recipe name or a comma separated list.
+  {"apache+mysql": '["recipe"]\napache\nmysql\n', ...}
+
+* POST /api/v0/recipe/<name>
+  This takes a parameter, recipe, which is the text of the recipe to save
+  under the <name>.
 
