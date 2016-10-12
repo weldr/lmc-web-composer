@@ -1013,13 +1013,19 @@ def run_bottle_app(config):
         return reply
 
     @route('/api/v0/module/list')
-    def module_list():
+    @route('/api/v0/module/list/<modules>')
+    def module_list(modules=""):
         """ Return a JSON string with the list of available modules.
 
             This is parse_json, accessible through the API, and converted to
             a format that bottle can deal with.
+
+            The module list is optional and can be a single module or a comma-separated
+            list.
         """
         module_list = pylorax.modules.parse_json(MODULE_REPO)
+        if modules:
+            module_list = [m for m in module_list if m['name'] in modules.split(',')]
         return {"modules" : module_list}
 
     @route('/api/v0/recipe/list')
