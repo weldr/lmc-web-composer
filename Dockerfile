@@ -32,11 +32,15 @@ RUN curl -SLO "https://nodejs.org/dist/v$NODE_VERSION/node-v$NODE_VERSION-linux-
 
 RUN echo 'PATH=/usr/local/bin/:$PATH' >> /etc/bashrc
 
-COPY . /root/lmc-composer-demo/
-
-# Update node dependencies
-RUN cd /root/lmc-composer-demo/share/composer-UI/ && npm install
-
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 EXPOSE 80
+
+## Do the things more likely to change below here. ##
+
+# Update node dependencies only if they have changed
+COPY ./share/composer-UI/ /root/lmc-composer-demo/share/composer-UI/
+RUN cd /root/lmc-composer-demo/share/composer-UI/ && npm install
+
+# Copy over everything else
+COPY . /root/lmc-composer-demo/
