@@ -1,0 +1,3 @@
+["Example Recipe"]
+name = "Example Recipe"
+modules = ["fm-httpd", "fm-php"]
