@@ -152,8 +152,6 @@ def parse_module(baseurl, module_name):
 
         return match.group(1)
 
-        return nevra_re.match(nevra).groups()
-
     # Recursive function to parse a module and its requirements
     def _enable_mod(baseurl, module_name, module_json):
         repos = []
