@@ -51,7 +51,12 @@
   <!-- React -->
   <script src="components/react/react.js"></script>
   <script src="components/react/react-dom.js"></script>
-  <script src="https://unpkg.com/babel-standalone@6.15.0/babel.min.js"></script>
+  <script src="node_modules/babel-standalone/babel.min.js"></script>
+
+  <!-- tomljs -->
+  <script src="node_modules/tomljs/index.js"></script>
+
+  <script src="composer-api.js"></script>
 
 <style>
 	.text-right strong {float:left;}
@@ -237,80 +242,65 @@
 
 <script type="text/babel">
 
+var RECIPELIST = {selectedRecipe: null, recipes: []};
 
-// type will be used to determine what icon displays
-// these values will be replaced by data retrieved via api call
-var COMPONENTS = [
-  {
-    type: "module",
-    name: "fm-group:rpm-development-tools",
-    summary: "These tools include core development tools such rpmbuild.",
-    version: "24",
-    release: "2",
-    requires: "0"
-  },
-  {
-    type: "module",
-    name: "fm-group:kde-education",
-    summary: "KDE Educational applications",
-    version: "24",
-    release: "1",
-    requires: "2"
-  },
-  {
-    type: "module",
-    name: "fm-group:xfce-desktop",
-    summary: "A lightweight desktop environment that works well on low end machines.",
-    version: "24",
-    release: "1",
-    requires: "0"
-  },
-  {
-    type: "module",
-    name: "fm-group:server-cfg",
-    summary: "This group contains all of Red Hat's custom server configuration tools.",
-    version: "24",
-    release: "2",
-    requires: "0"
-  },
-  {
-    type: "module",
-    name: "fm-group:virtualization-headless",
-    summary: "These packages provide a headless virtualization environment.",
-    version: "24",
-    release: "2",
-    requires: "0"
-  },
-  {
-    type: "module",
-    name: "fm-group:legacy-software-development",
-    summary: "These packages provide compatibility with previous releases.",
-    version: "24",
-    release: "1",
-    requires: "0"
-  }
-
-];
-
-var RECIPELIST = {
-  recipes: [
-    {
-      name: "Recipe X",
-      version: "1",
-      test: "2",
-      dev: "0",
-      prod: "1"
-    },
-    {
-      name: "Recipe Y",
-      version: "3",
-      test: "4",
-      dev: "2",
-      prod: "1"
-    }
-  ],
-  selectedRecipe: null
+var fetchRecipeList = function() {
+  $.ajax({
+    url: composer_api_host+"/api/v0/recipe/list",
+    dataType: 'json',
+    cache: false,
+    success: fetchRecipes
+  });
 };
+var fetchRecipes = function(recipeList) {
+  for (var i=0; i < recipeList.recipes.length; i++) {
+    $.ajax({
+      url: composer_api_host+"/api/v0/recipe/" + recipeList.recipes[i],
+      dataType: "json",
+      cache: false,
+      recipeName: recipeList.recipes[i],
+      success: parseRecipe
+    });
+  }
+};
+var parseRecipe = function(recipeData) {
+  // Parse the TOML data
+  recipeData = toml(recipeData[this.recipeName]);
+
+  for (var tableName in recipeData) {
+    var recipeName = recipeData[tableName].name;
+
+    // For each recipe, create an initial object, and fill in the rest via the API
+    var module_list = recipeData[tableName].modules.map(function(modname) {
+      var modobj = {
+        "type": "module",
+        "name": modname
+      };
+
+      $.ajax({
+        url: composer_api_host+"/api/v0/module/list/" + modname,
+        dataType: "json",
+        cache: false,
+        success: function(moduleData) {
+          modobj.version = moduleData.modules[0].version;
+          modobj.release = moduleData.modules[0].release;
+          modobj.summary = moduleData.modules[0].summary;
+        }
+      });
+
+      return modobj;
+    });
+
+    var recipe = {
+      "name":     recipeName,
+      "modules":  module_list
+    };
+
+    RECIPELIST.recipes.push(recipe);
+    onChange();
+  }
+}
+fetchRecipeList();
 
 var onBacktoRecipes = function () {
     RECIPELIST.selectedRecipe = null;
@@ -319,7 +309,8 @@ var onBacktoRecipes = function () {
 
 var onSelectRecipe = function (event) {
     var target = event.currentTarget;
-    RECIPELIST.selectedRecipe = $(target).html();
+    var recipeName = $(target).html()
+    RECIPELIST.selectedRecipe = RECIPELIST.recipes.filter(r => r.name == recipeName)[0];
     onChange();
 };
 
@@ -710,7 +701,7 @@ var RecipeApp = React.createClass({
       );
     } else {
       return (
-        <FilterableComponentList components={COMPONENTS} selectedRecipe={selectedRecipe} onBacktoRecipes={onBacktoRecipes} />
+        <FilterableComponentList components={selectedRecipe.modules} selectedRecipe={selectedRecipe.name} onBacktoRecipes={onBacktoRecipes} />
       );
     }
   }
