@@ -52,5 +52,6 @@ local:
 	@echo "The archive is in $(PKGNAME)-$(VERSION).tar.gz"
 
 ci:
-	@sudo docker build -t composer-test .
-	@sudo docker run --rm -e "top_srcdir=/root/lmc-composer-demo/src" --entrypoint make composer-test -C /root/lmc-composer-demo check
+	sudo docker build -t composer-test .
+	sudo docker run --rm -e "top_srcdir=/root/lmc-composer-demo/src" --entrypoint make composer-test -C /root/lmc-composer-demo check
+	sudo docker save -o composer-test-latest.tar composer-test:latest
