@@ -40,7 +40,12 @@ EXPOSE 80
 
 # Update node dependencies only if they have changed
 COPY ./share/composer-UI/ /root/lmc-composer-demo/share/composer-UI/
-RUN cd /root/lmc-composer-demo/share/composer-UI/ && npm install
+RUN cd /root/lmc-composer-demo/share/composer-UI/ && npm install && node run build
 
 # Copy over everything else
-COPY . /root/lmc-composer-demo/
+# Do not re-copy ./share/composer-UI/
+COPY ./share/composer-template.ks /root/lmc-composer-demo/share/
+COPY ./share/html/ /root/lmc-composer-demo/share/html/
+COPY ./share/recipes/ /root/lmc-composer-demo/share/recipes/
+COPY ./share/templates.d/ /root/lmc-composer-demo/share/templates.d/
+COPY ./src/ /root/lmc-composer-demo/src/
