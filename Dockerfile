@@ -1,7 +1,7 @@
 # A CentOS7 Stack image using upstream repo
 FROM fedora:24
 MAINTAINER Brian C. Lane <bcl@redhat.com>
-RUN dnf -y install dnf-plugins-core && dnf -y copr enable @modularity/modulemd && dnf -y install lorax anaconda-tui python3-bottle python3-modulemd gnupg tar git && dnf -y install make python3-pylint python3-pocketlint python3-sphinx_rtd_theme python3-magic
+RUN dnf -y install dnf-plugins-core && dnf -y copr enable @modularity/modulemd && dnf -y install lorax anaconda-tui python3-bottle python3-modulemd python3-toml gnupg tar git && dnf -y install make python3-pylint python3-pocketlint python3-sphinx_rtd_theme python3-magic
 
 # Based on official node docker image
 # gpg keys listed at https://github.com/nodejs/node

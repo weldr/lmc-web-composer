@@ -34,6 +34,7 @@ import dnf
 from binascii import hexlify
 import queue
 import requests
+import toml
 
 # Use pykickstart to calculate disk image size
 from pykickstart.parser import KickstartParser
@@ -1041,13 +1042,22 @@ def run_bottle_app(config):
     def get_recipe(names=""):
         """ Return a JSON string with the content of the recipes
 
-        eg. {"apache+mysql": '["recipe"]\napache\nmysql\n', ...}
+        eg. {"apache+mysql": { name: "apache+mysql", modules: [ "apache, "mysql" ] } }
+
         """
         recipes_json = {}
         for recipe in names.split(","):
             recipe_path = RECIPE_FILES+os.path.basename(recipe)
             if os.path.exists(recipe_path):
-                recipes_json[recipe] = open(recipe_path).read()
+                with open(recipe_path) as f:
+                    recipe_data = toml.loads(f.read())
+
+                    # Convert the recipe name key into a regular "name"
+                    # property, and send the recipe as a flat { name: ..., description: ..., etc }
+                    recipe_name = list(recipe_data.keys())[0]
+                    recipe_data[recipe_name]["name"] = recipe_name
+
+                    recipes_json[recipe] = recipe_data[recipe_name]
 
         return recipes_json
 
