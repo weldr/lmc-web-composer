@@ -49,3 +49,5 @@ COPY ./share/html/ /root/lmc-composer-demo/share/html/
 COPY ./share/recipes/ /root/lmc-composer-demo/share/recipes/
 COPY ./share/templates.d/ /root/lmc-composer-demo/share/templates.d/
 COPY ./src/ /root/lmc-composer-demo/src/
+COPY ./Makefile /root/lmc-composer-demo/
+COPY ./tests /root/lmc-composer-demo/tests/
