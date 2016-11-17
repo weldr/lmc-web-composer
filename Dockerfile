@@ -39,8 +39,12 @@ EXPOSE 80
 ## Do the things more likely to change below here. ##
 
 # Update node dependencies only if they have changed
+COPY ./share/composer-UI/package.json /root/lmc-composer-demo/share/composer-UI/package.json
+RUN cd /root/lmc-composer-demo/share/composer-UI/ && npm install
+
+# Copy the rest of the UI files over and compile them
 COPY ./share/composer-UI/ /root/lmc-composer-demo/share/composer-UI/
-RUN cd /root/lmc-composer-demo/share/composer-UI/ && npm install && node run build
+RUN cd /root/lmc-composer-demo/share/composer-UI/ && node run build
 
 # Copy over everything else
 # Do not re-copy ./share/composer-UI/
