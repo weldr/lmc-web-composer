@@ -89,8 +89,9 @@ The API is available from /api/v0/ and the available methods are:
   indicate that the compose has finished after it has been terminated.
 
 * GET /api/v0/compose/types
-  Returns a JSON object with the possible compose types and their support
-  status (true or false) for the composer instance. eg. {"iso": true, ...}
+  Returns a list of JSON objects with the possible compose types and their support
+  status (true or false) for the composer instance. eg. 
+  {"types": [{"name": "iso", "enabled": "true"}, ...] }
 
 * GET /api/v0/isos
   Returns a list of the available composed ISO as a JSON object
