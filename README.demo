@@ -89,8 +89,9 @@ The API is available from /api/v0/ and the available methods are:
   indicate that the compose has finished after it has been terminated.
 
 * GET /api/v0/compose/types
-  Returns a JSON object with the possible compose types and their support
-  status (true or false) for the composer instance. eg. {"iso": true, ...}
+  Returns a list of JSON objects with the possible compose types and their support
+  status (true or false) for the composer instance. eg. 
+  {"types": [{"name": "iso", "enabled": "true"}, ...] }
 
 * GET /api/v0/isos
   Returns a list of the available composed ISO as a JSON object
@@ -124,7 +125,7 @@ The API is available from /api/v0/ and the available methods are:
 * GET /api/v0/recipe/<names>
   Return a JSON object with the content of the recipe(s). names can be a single
   recipe name or a comma separated list.
-  {"apache+mysql": '["recipe"]\napache\nmysql\n', ...}
+  {"apache+mysql": {"name": "apache+mysql", description: "Apache and MySQL", modules: ["apache", "mysql"]} }
 
 * POST /api/v0/recipe/<name>
   This takes a parameter, recipe, which is the text of the recipe to save
